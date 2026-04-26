@@ -61,6 +61,14 @@ Every student already knows what an app looks like. DragTK turns that prior know
 
 ---
 
+## Known limitations
+
+- Limited undo / redo support
+- Performance may degrade the more widgets are added and for larger projects
+- Users must place their code between the marked start and end areas or could be at risk of losing work. The app does its best to prevent this
+
+---
+
 ## Getting Started
 
 1. Download the `.exe` from [Releases](../../releases/latest) or clone the repository
@@ -71,8 +79,6 @@ Every student already knows what an app looks like. DragTK turns that prior know
 6. Click **Run** to launch your application
 
 Full widget guides and example projects are available at **[dragtk.com/learn](https://dragtk.com/learn)**.
-
----
 
 ---
 
