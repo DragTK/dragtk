@@ -1,0 +1,10 @@
+Copyright (c) 2025-2026 Marcus Douglas
+
+This software is licensed under the MIT License.
+
+You are free to use, copy, modify, and distribute this software, provided that
+you include this copyright notice and the license text in any copies or
+substantial portions of the software.
+
+For the full license text, see the LICENSE file included with this software or
+visit: https://opensource.org/licenses/MIT
