@@ -2857,6 +2857,7 @@ class GUIBuilderApp(tk.Tk):
 
 
             elif props["type"] == "Checkbutton" and widget:
+                widget.config(text=text)
                 style_name = f"{name}.TCheckbutton"
                 style = ttk.Style()
                 style.configure(
@@ -2868,6 +2869,7 @@ class GUIBuilderApp(tk.Tk):
                 widget.config(style=style_name)
 
             elif props["type"] == "Radiobutton" and widget:
+                widget.config(text=text)
                 style_name = f"{name}.TRadiobutton"
                 style = ttk.Style()
                 style.configure(
