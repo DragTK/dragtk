@@ -818,6 +818,8 @@ class GUIBuilderApp(tk.Tk):
         self.apply_saved_settings()
         self.apply_settings_to_ui()
 
+        self.update_window_title_with_path("untitled")
+
         # ---------------- BINDS ----------------
 
         def _show_canvas_context(event):
@@ -893,57 +895,39 @@ class GUIBuilderApp(tk.Tk):
 
     # Custom copy func to prevent actions on protected app generated code
     def _on_ctrl_copy(self, event=None):
-
+        if not getattr(self, "protected_enabled", True):
+            return None  # protection off — allow everything
         sel = self.code_text.tag_ranges(tk.SEL)
-
         if sel and self.code_text.tag_nextrange("protected", sel[0], sel[1]):
-            tk.messagebox.showwarning(
-                "Protected Code",
-                "You cannot copy protected sections."
-            )
+            tk.messagebox.showwarning("Protected Code", "You cannot copy protected sections.")
             return "break"
-
-        return None  # allow default copy
+        return None
 
 
     # Custom cut func to prevent actions on protected app generated code
     def _on_ctrl_cut(self, event=None):
-
+        if not getattr(self, "protected_enabled", True):
+            return None
         sel = self.code_text.tag_ranges(tk.SEL)
-
         if sel and self.code_text.tag_nextrange("protected", sel[0], sel[1]):
-            tk.messagebox.showwarning(
-                "Protected Code",
-                "You cannot cut protected sections."
-            )
+            tk.messagebox.showwarning("Protected Code", "You cannot cut protected sections.")
             return "break"
-
-        return None  # allow default cut
+        return None
 
 
     # Custom paste func to prevent actions on protected app generated code
     def _on_ctrl_paste(self, event=None):
-
+        if not getattr(self, "protected_enabled", True):
+            return None
         index = self.code_text.index("insert")
-
-        # block paste into protected region
         if "protected" in self.code_text.tag_names(index):
-            tk.messagebox.showwarning(
-                "Protected Code",
-                "You cannot paste into a protected section."
-            )
+            tk.messagebox.showwarning("Protected Code", "You cannot paste into a protected section.")
             return "break"
-
-        # block overwrite via selection
         sel = self.code_text.tag_ranges(tk.SEL)
         if sel and self.code_text.tag_nextrange("protected", sel[0], sel[1]):
-            tk.messagebox.showwarning(
-                "Protected Code",
-                "You cannot paste over protected sections."
-            )
+            tk.messagebox.showwarning("Protected Code", "You cannot paste over protected sections.")
             return "break"
-
-        return None  # allow default paste
+        return None
 
     
 
@@ -1077,25 +1061,27 @@ class GUIBuilderApp(tk.Tk):
     # Not fully built properly but better than nothing
     # Needs work
     def _custom_undo(self, event=None):
-
-
         if len(self.undo_stack) > 0:
             last_action = self.undo_stack[-1]
-            
             self.redo_stack.append(self.undo_stack[-1])
             del self.undo_stack[-1]
 
             if last_action['type'] == "code_editor_text":
+                # Save scroll position before replacing text
+                yview = self.code_text.yview()
                 self.code_text.delete('1.0', tk.END)
                 self.code_text.insert('1.0', last_action['text'])
                 self.do_full_highlight()
-                
+                # Restore scroll position
+                self.code_text.yview_moveto(yview[0])
+                self.line_numbers.yview_moveto(yview[0])
             else:
                 if last_action['action_type'] == "add":
                     self._undo_delete_element(last_action['name'])
                 elif last_action['action_type'] == "del":
                     self.add_element_from_undo_redo(last_action, 'copy', 'undo') # was new instead of copy but not sure why?
-                
+
+            self._update_protected_tags()
         #print("Undo after UNDO ---")
         #self.stack_out(self.undo_stack)
 
@@ -1107,26 +1093,25 @@ class GUIBuilderApp(tk.Tk):
     # Not fully built properly but better than nothing
     # Needs work
     def _custom_redo(self, event=None):
-
-        
-
         if len(self.redo_stack) > 0:
-
-
             last_action = self.redo_stack[-1]
-            
             del self.redo_stack[-1]
 
             if last_action['type'] == "code_editor_text":
+                yview = self.code_text.yview()
                 self.code_text.delete('1.0', tk.END)
                 self.code_text.insert('1.0', last_action['text'])
                 self.do_full_highlight()
+                self.code_text.yview_moveto(yview[0])
+                self.line_numbers.yview_moveto(yview[0])
                 self.undo_stack.append(last_action)
             else:
                 if last_action['action_type'] == "del":
                     self.add_element_from_undo_redo(last_action, 'copy', 'redo')
                 else:
                     self.add_element_from_undo_redo(last_action, 'copy', 'redo')
+
+            self._update_protected_tags()
 
         #print("Undo after REDO ---")
         #self.stack_out(self.undo_stack)
@@ -1150,41 +1135,46 @@ class GUIBuilderApp(tk.Tk):
 
 
     def _update_protected_tags(self):
-
-        # Tag protected sections: function definition lines and auto-generated GUI code.
         self.code_text.tag_remove("protected", "1.0", tk.END)
         lines = self.code_text.get("1.0", tk.END).splitlines()
+
+        # Lines that must never be edited
+        protected_exact = {
+            "# --- BUTTON FUNCTIONS ---",
+            "# --- COMBOBOX OPTION LOADER FUNCTIONS ---",
+            "# --- LISTBOX OPTION LOADER FUNCTIONS ---",
+            "# --- TREEVIEW FUNCTIONS ---",
+            "# --- ON LOAD ---",
+        }
 
         # Find insert section bounds
         try:
             insert_start_idx = lines.index("# ==========================START=============================") + 1
-            insert_end_idx = lines.index("# ============================END=============================") + 1
+            insert_end_idx   = lines.index("# ============================END=============================") + 1
             if insert_end_idx != -1:
-                start_index = f"{insert_end_idx}.0"
-                end_index = f"{insert_end_idx}.end"
-                self.code_text.tag_add("protected", start_index, end_index)
+                self.code_text.tag_add("protected", f"{insert_end_idx}.0", f"{insert_end_idx}.end")
         except ValueError:
             insert_start_idx = insert_end_idx = -1
 
-
         # Protect special function definitions OUTSIDE the insert section
+        # and exact section marker lines
         for line_num, line in enumerate(lines, start=1):
             stripped = line.strip()
-            if ((line_num < insert_start_idx or line_num > insert_end_idx)
-                and stripped.startswith(("def on_", "def load_", "def get_")) 
-                and stripped.endswith("():")):
-                start_index = f"{line_num}.0"
-                end_index = f"{line_num}.end"
-                self.code_text.tag_add("protected", start_index, end_index)
 
-        # Protect the auto-generated GUI section after the marker
+            if stripped in protected_exact:
+                self.code_text.tag_add("protected", f"{line_num}.0", f"{line_num}.end")
+
+            if ((line_num < insert_start_idx or line_num > insert_end_idx)
+                    and stripped.startswith(("def on_", "def load_", "def get_"))
+                    and stripped.endswith("():")):
+                self.code_text.tag_add("protected", f"{line_num}.0", f"{line_num}.end")
+
+        # Protect the auto-generated GUI section after the marker — your original logic
         for line_num, line in enumerate(lines, start=1):
             if line.strip() == "# -------------- Auto Generated GUI Code -------------- #":
                 for protect_line in range(line_num, len(lines) + 1):
-                    start_index = f"{protect_line}.0"
-                    end_index = f"{protect_line}.end"
-                    self.code_text.tag_add("protected", start_index, end_index)
-                break  # Only first occurrence
+                    self.code_text.tag_add("protected", f"{protect_line}.0", f"{protect_line}.end")
+                break
 
 
 
@@ -1329,7 +1319,7 @@ class GUIBuilderApp(tk.Tk):
         fg        = t["fg"]
         entry_bg  = t["entry_bg"]
         accent    = t["accent"]
-        header_bg = t["header"]
+        header_bg = t["selected_bg"]
 
         win.configure(bg=bg)
 
@@ -2015,7 +2005,7 @@ class GUIBuilderApp(tk.Tk):
         }
 
         self.undo_stack.append(props)
-        self.redo_stack = []
+        #self.redo_stack = []
         
 
     # Sets code as dirty (meaning a change has been made so project needs saved)
@@ -4034,6 +4024,10 @@ class GUIBuilderApp(tk.Tk):
 
         # ---------------- EDIT ACTIONS ----------------
         def cut():
+            
+            if not getattr(self, "protected_enabled", True):
+                self.code_text.event_generate("<<Cut>>")
+                return
 
             sel = self.code_text.tag_ranges(tk.SEL)
 
@@ -4049,6 +4043,10 @@ class GUIBuilderApp(tk.Tk):
 
         def copy():
 
+            if not getattr(self, "protected_enabled", True):
+                self.code_text.event_generate("<<Copy>>")
+                return
+
             sel = self.code_text.tag_ranges(tk.SEL)
 
             if sel:
@@ -4062,6 +4060,11 @@ class GUIBuilderApp(tk.Tk):
             self.code_text.event_generate("<<Copy>>")
 
         def paste():
+
+            if not getattr(self, "protected_enabled", True):
+                self.code_text.event_generate("<<Paste>>")
+                self.do_full_highlight()
+                return
 
             # get insertion point (where paste would go)
             index = self.code_text.index("insert")
@@ -4123,6 +4126,7 @@ class GUIBuilderApp(tk.Tk):
             r"# --- COMBOBOX OPTION LOADER FUNCTIONS ---",
             r"# --- LISTBOX OPTION LOADER FUNCTIONS ---",
             r"# --- TREEVIEW FUNCTIONS ---",
+            r"# --- ON LOAD ---", 
             r"# -------------- Auto Generated GUI Code -------------- #"
         ]
         stop_pattern = "|".join(stop_markers)
@@ -4131,8 +4135,8 @@ class GUIBuilderApp(tk.Tk):
         # - Match def <handler>(...):
         # - Capture everything until the next 'def' at start of line OR any stop marker OR EOF
         pattern = re.compile(
-            r"^def\s+(on_\w+_click|get_\w+_data|load_\w+_options)\s*\([^)]*\):\n"  # match function def
-            r"(.*?)(?=^def\s|^(" + stop_pattern + r")|\Z)",  # non-greedy until next def, section marker, or EOF
+            r"^def\s+(on_\w+_click|get_\w+_data|load_\w+_options|on_load)\s*\([^)]*\):\n"
+            r"(.*?)(?=^def\s|^(" + stop_pattern + r")|\Z)",
             re.MULTILINE | re.DOTALL
         )
 
@@ -4195,6 +4199,7 @@ class GUIBuilderApp(tk.Tk):
         lines.append('# ⚠️ This section is NOT overwritten by the generator')
         lines.append('# ⚠️ Do NOT write outside this section or your changes may be lost')
         lines.append('# ==========================START=============================\n')
+        lines.append('')
         
 
         if existing_code:
@@ -4202,9 +4207,10 @@ class GUIBuilderApp(tk.Tk):
         #lines.append('')
         #lines.append('\n# !!!!!!!!!!!! INSERT YOUR CODE ABOVE THIS COMMENT !!!!!!!!!!!! #\n')
 
+        lines.append('')
         lines.append('\n# ============================END=============================')
         lines.append('# 🟢 END USER CODE SECTION')
-        lines.append('# ============================================================')
+        lines.append('# ============================================================\n')
 
         lines.append('# ---------------- Widget Handlers ---------------- #\n')
         lines.append('# Automatically generated handlers for widgets.\n')
@@ -4213,6 +4219,7 @@ class GUIBuilderApp(tk.Tk):
         lines.append('# Only add or modify code inside the generated handler functions.')
         lines.append('# Any code outside these functions may be removed during regeneration.')
         lines.append('# Actions such as adding or moving existing widgets in the canvas will trigger regeneration.')
+
 
         # --- BUTTON FUNCTIONS ---
         lines.append('\n# --- BUTTON FUNCTIONS ---\n')
@@ -4226,6 +4233,7 @@ class GUIBuilderApp(tk.Tk):
                     lines.append(f"    # Code for {func_name}")
                     lines.append("    pass")
                 lines.append('')
+
 
         # --- COMBOBOX LOADER FUNCTIONS ---
         lines.append('\n# --- COMBOBOX OPTION LOADER FUNCTIONS ---\n')
@@ -4271,6 +4279,18 @@ class GUIBuilderApp(tk.Tk):
                     lines.append("    ]")
                     lines.append("    return headers, sample_data")
                 lines.append('')
+
+
+        # ---- ON LOAD FUNCTION (mandatory, preserved, called after all widgets init) ----
+        lines.append('\n# --- ON LOAD ---\n')
+        lines.append('# Called automatically after all widgets are created.')
+        lines.append('# Use this to run any startup logic for your app.\n')
+        lines.append('def on_load():')
+        if 'on_load' in self.preserved_handlers:
+            lines.append(self.preserved_handlers['on_load'])
+        else:
+            lines.append('    pass')
+        lines.append('')
 
         # --- GUI CREATION SECTION ---
         lines.append('\n# -------------- Auto Generated GUI Code -------------- #\n')
@@ -4486,7 +4506,8 @@ class GUIBuilderApp(tk.Tk):
                     f"width={p['w']}, height={p['h']})\n"
                 )
             
-
+        lines.append("\n# Run startup logic")
+        lines.append("on_load()")
         lines.append("root.mainloop()\n")
 
         # Update the editor
@@ -5125,13 +5146,14 @@ class GUIBuilderApp(tk.Tk):
             r"# --- COMBOBOX OPTION LOADER FUNCTIONS ---",
             r"# --- LISTBOX OPTION LOADER FUNCTIONS ---",
             r"# --- TREEVIEW FUNCTIONS ---",
+            r"# --- ON LOAD ---", 
             r"# -------------- Auto Generated GUI Code -------------- #"
         ]
         stop_pattern = "|".join(stop_markers)
 
         pattern = re.compile(
-            r"^def\s+(on_\w+_click|get_\w+_data|load_\w+_options)\s*\([^)]*\):\n"  # match function
-            r"(.*?)(?=^def\s|^(" + stop_pattern + r")|\Z)",  # stop at next def, section marker, or EOF
+            r"^def\s+(on_\w+_click|get_\w+_data|load_\w+_options|on_load)\s*\([^)]*\):\n"
+            r"(.*?)(?=^def\s|^(" + stop_pattern + r")|\Z)",
             re.MULTILINE | re.DOTALL
         )
 
@@ -5390,6 +5412,8 @@ class GUIBuilderApp(tk.Tk):
 
         self.center_tabs.tab(0, text="Canvas")
         self.center_tabs.tab(1, text="Code")
+
+        self.update_window_title_with_path("untitled")
 
         self.reset_stacks()
 
