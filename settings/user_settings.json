@@ -3,6 +3,6 @@
     "font_family": "Consolas",
     "bg_color": "white",
     "protected_enabled": true,
-    "custom_font_size": 14,
+    "custom_font_size": 10,
     "mode": "light"
 }
