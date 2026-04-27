@@ -2,7 +2,7 @@
     "font_size": 12,
     "font_family": "Consolas",
     "bg_color": "white",
-    "protected_enabled": true,
-    "custom_font_size": 10,
+    "protected_enabled": false,
+    "custom_font_size": 14,
     "mode": "light"
 }

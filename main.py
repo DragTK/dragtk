@@ -89,6 +89,147 @@ class CustomAskString(simpledialog.Dialog):
     def apply(self):
         self.result = self.entry.get()
 
+
+
+class RadioGroupDialog(tk.Toplevel):
+    def __init__(self, parent, existing_groups):
+        super().__init__(parent)
+        self.result = None
+        self.existing_groups = list(existing_groups)
+
+        self.title("Radiobutton Group")
+        self.geometry("360x300")
+        self.minsize(320, 260)
+        self.resizable(True, True)
+        self.transient(parent)
+        self.grab_set()
+
+        # Theme colours
+        t = parent.THEMES.get(parent.mode.get(), parent.THEMES["light"])
+        bg       = t["bg"]
+        panel    = t["panel"]
+        fg       = t["fg"]
+        entry_bg = t["entry_bg"]
+        header   = t["selected_bg"]
+
+        self.configure(bg=bg)
+
+        try:
+            icon_path = resource_path("assets/icon.ico")
+            if os.path.exists(icon_path):
+                self.iconbitmap(icon_path)
+        except:
+            pass
+
+        # Center
+        self.update_idletasks()
+        x = parent.winfo_x() + (parent.winfo_width() // 2) - 180
+        y = parent.winfo_y() + (parent.winfo_height() // 2) - 150
+        self.geometry(f"+{x}+{y}")
+
+        # ---- Header ----
+        tk.Label(self, text=" Radiobutton Group", bg=header, fg="white",
+                 font=("Calibri", 11, "bold"), anchor="w", padx=8
+                 ).pack(fill=tk.X)
+
+        pad = tk.Frame(self, bg=bg)
+        pad.pack(fill=tk.BOTH, expand=True, padx=12, pady=10)
+
+        # ---- Select or create ----
+        tk.Label(pad, text="Select existing group or type a new name:",
+                 bg=bg, fg=fg, font=("Calibri", 10)).pack(anchor="w", pady=(0, 4))
+
+        self.group_var = tk.StringVar()
+        self.combo = ttk.Combobox(pad, textvariable=self.group_var,
+                                  values=self.existing_groups, font=("Calibri", 10))
+        self.combo.pack(fill=tk.X, pady=(0, 8))
+        if self.existing_groups:
+            self.combo.set(self.existing_groups[0])
+
+        # ---- Existing groups list ----
+        tk.Label(pad, text="Existing groups:", bg=bg, fg=fg,
+                 font=("Calibri", 10)).pack(anchor="w")
+
+        list_frame = tk.Frame(pad, bg=bg)
+        list_frame.pack(fill=tk.BOTH, expand=True, pady=(4, 8))
+
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical")
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.group_list = tk.Listbox(list_frame, font=("Consolas", 10),
+                                     bg=entry_bg, fg=fg,
+                                     selectbackground=header,
+                                     selectforeground="white",
+                                     yscrollcommand=scrollbar.set,
+                                     height=5)
+        self.group_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=self.group_list.yview)
+
+        for g in self.existing_groups:
+            self.group_list.insert(tk.END, g)
+
+        # Clicking list sets combobox
+        self.group_list.bind("<<ListboxSelect>>", self._on_list_select)
+
+        # ---- Delete button ----
+        btn_row = tk.Frame(pad, bg=bg)
+        btn_row.pack(fill=tk.X)
+
+        tk.Button(btn_row, text="🗑 Delete selected group",
+                  bg=panel, fg=fg, relief="flat", bd=1,
+                  font=("Calibri", 9), cursor="hand2",
+                  command=self._delete_group
+                  ).pack(side=tk.LEFT)
+
+        # ---- OK / Cancel ----
+        tk.Frame(self, bg=t["border_col"], height=1).pack(fill=tk.X, pady=(4, 0))
+
+        button_bar = tk.Frame(self, bg=bg)
+        button_bar.pack(fill=tk.X, padx=12, pady=8)
+
+        tk.Button(button_bar, text="Cancel", command=self.destroy,
+                  bg=panel, fg=fg, relief="raised", bd=2, padx=10
+                  ).pack(side=tk.RIGHT, padx=(4, 0))
+
+        tk.Button(button_bar, text="OK", command=self._confirm,
+                  bg=header, fg="white", relief="raised", bd=2, padx=10,
+                  font=("Calibri", 10, "bold"), cursor="hand2"
+                  ).pack(side=tk.RIGHT)
+
+        self.combo.focus_set()
+        self.bind("<Return>", lambda e: self._confirm())
+        self.bind("<Escape>", lambda e: self.destroy())
+
+        self.wait_window()
+
+    def _on_list_select(self, event):
+        sel = self.group_list.curselection()
+        if sel:
+            self.group_var.set(self.group_list.get(sel[0]))
+
+    def _delete_group(self):
+        sel = self.group_list.curselection()
+        if not sel:
+            return
+        group = self.group_list.get(sel[0])
+        if messagebox.askyesno("Delete Group",
+                               f"Delete group '{group}'?\n\nRadiobuttons in this group will need reassigning.",
+                               parent=self):
+            self.group_list.delete(sel[0])
+            self.existing_groups.remove(group)
+            self.combo.configure(values=self.existing_groups)
+            if self.group_var.get() == group:
+                self.group_var.set(self.existing_groups[0] if self.existing_groups else "")
+
+    def _confirm(self):
+        val = self.group_var.get().strip()
+        if not val:
+            messagebox.showwarning("No Group", "Please enter or select a group name.", parent=self)
+            return
+        self.result = val
+        self.destroy()
+
+
 # ---------------- Main Application ----------------
 
 class GUIBuilderApp(tk.Tk):
@@ -875,6 +1016,16 @@ class GUIBuilderApp(tk.Tk):
         menu.add_command(label='Paste',      command=lambda: self.paste_element(name))
         menu.add_command(label='Delete',     command=lambda: self.delete_selected_on_click(name))
 
+        # Add radiobutton group option if applicable
+        props = self.elements.get(name, {})
+        if props.get('type') == 'Radiobutton':
+            menu.add_separator()
+            current_group = props.get('_radio_group_name', 'None')
+            menu.add_command(
+                label=f'Group: {current_group}  ✎',
+                command=lambda: self._change_radio_group(name)
+            )
+
         def cleanup():
             try:
                 menu.destroy()
@@ -883,6 +1034,44 @@ class GUIBuilderApp(tk.Tk):
 
         menu.bind("<Unmap>", lambda e: self.after(100, cleanup))
         menu.tk_popup(event.x_root, event.y_root)
+
+
+    def _change_radio_group(self, name):
+        props = self.elements.get(name)
+        if not props:
+            return
+
+        existing_groups = sorted({
+            p.get('_radio_group_name')
+            for p in self.elements.values()
+            if p['type'] == 'Radiobutton' and '_radio_group_name' in p
+        })
+
+        dialog = RadioGroupDialog(self, existing_groups)
+        new_group = dialog.result
+
+        if not new_group or new_group == props.get('_radio_group_name'):
+            return
+
+        # Update the group
+        props['_radio_group_name'] = new_group
+
+        if new_group not in self.radio_groups:
+            self.radio_groups[new_group] = tk.StringVar(value='')
+
+        props['_radio_group_var'] = self.radio_groups[new_group]
+
+        # Update the visual widget's variable
+        widget = props.get('_widget')
+        if widget and hasattr(widget, 'configure'):
+            try:
+                widget.configure(variable=self.radio_groups[new_group])
+            except Exception:
+                pass
+
+        self.normal_generate_code()
+        self._update_protected_tags()
+        self.show_toast(f"Group changed to '{new_group}'")
 
     
     # Option to toggle grid snapping (either 10px or 1px)
@@ -2621,23 +2810,9 @@ class GUIBuilderApp(tk.Tk):
                 for p in self.elements.values()
                 if p['type'] == 'Radiobutton' and '_radio_group_name' in p
             })
-
-            if existing_groups:
-                dialog = CustomAskString(self, "Radiobutton Group", f"Enter group name or pick existing:\nExisting: {', '.join(existing_groups)}")
-                choice = dialog.result
-                """choice = simpledialog.askstring(
-                    "Radiobutton Group",
-                    f"Enter group name or pick existing:\nExisting: {', '.join(existing_groups)}"
-                )"""
-            else:
-                dialog = CustomAskString(self, "Radiobutton Group", "Enter new group name for this radiobutton:")
-                choice = dialog.result
-                """choice = simpledialog.askstring(
-                    "Radiobutton Group",
-                    "Enter new group name for this radiobutton:"
-                )"""
-
-            if not choice:  # user cancelled
+            dialog = RadioGroupDialog(self, existing_groups)
+            choice = dialog.result
+            if not choice:
                 return
 
         if src == 'new':
@@ -2743,50 +2918,74 @@ class GUIBuilderApp(tk.Tk):
 
     # For making sure when copy and pasting in the code editor or other entries
     # it does not result in copy and pasting in the canvas
-    def _conditional_paste(self, event, name):
+    def _conditional_paste(self, event, name=None):
         focused = self.focus_get()
-        if focused == self.code_text or (hasattr(focused, 'winfo_class') and focused.winfo_class() in ['Text', 'Entry', 'TEntry']):
+        if focused == self.code_text or (hasattr(focused, 'winfo_class') and 
+           focused.winfo_class() in ['Text', 'Entry', 'TEntry']):
             return
-        else:
-            self.paste_element(name)
+        self.paste_element()
 
     # Copy an element (widget)
     def copy_element(self, name):
-
-        self.select_element(name)
         element = self.elements.get(name)
         if not element:
             return
-
-        if name in self.elements:
-            # store a copy of the properties
-            self.copied_element = self.elements[name].copy()
+        self.select_element(name)
+        # Strip private widget refs — only store serialisable properties
+        self.copied_element = {
+            k: v for k, v in element.items()
+            if not k.startswith('_') or k == '_radio_group_name'
+        }
 
 
     # Paste an element (widget)
-    def paste_element(self, name):
-        
+    def paste_element(self, name=None):
         if not hasattr(self, "copied_element") or not self.copied_element:
-            return  # nothing copied
+            return
 
-        eltype = self.copied_element['type']
+        eltype = self.copied_element.get('type')
+        if not eltype:
+            return
 
-        # Generate next name like button15, label3, etc.
         new_name = next_name(self.counters, eltype.lower())
 
-        # Create a new props dict from copied one
-        new_props = self.copied_element.copy()
+        # Fresh copy with no stale widget refs
+        new_props = {
+            k: v for k, v in self.copied_element.items()
+            if not k.startswith('_')
+        }
         new_props['name'] = new_name
+        new_props['x'] = new_props.get('x', 50) + 20
+        new_props['y'] = new_props.get('y', 50) + 20
 
-        # Shift position a bit so it doesn't sit directly on top
-        new_props['x'] += 20
-        new_props['y'] += 20
+        # ---- Handle radiobutton group BEFORE adding to elements ----
+        if eltype == 'Radiobutton':
+            # Restore the group name from copied element (it was stripped)
+            original_group = self.copied_element.get('_radio_group_name')
 
-        # Add to elements and draw
+            existing_groups = sorted({
+                p.get('_radio_group_name')
+                for p in self.elements.values()
+                if p['type'] == 'Radiobutton' and p.get('_radio_group_name')
+            })
+
+            dialog = RadioGroupDialog(self, existing_groups)
+            choice = dialog.result
+            if not choice:
+                return  # user cancelled — don't paste
+
+            new_props['_radio_group_name'] = choice
+
         self.elements[new_name] = new_props
         self._create_visual(new_props)
         self.normal_generate_code()
         self._update_protected_tags()
+
+        # Push to undo stack — clean copy
+        undo_copy = {k: v for k, v in new_props.items() if not k.startswith('_')}
+        undo_copy['action_type'] = 'add'
+        self.undo_stack.append(undo_copy)
+        self.redo_stack.clear()
 
 
 
@@ -2995,12 +3194,7 @@ class GUIBuilderApp(tk.Tk):
                     for p in self.elements.values()
                     if p['type'] == 'Radiobutton' and '_radio_group_name' in p
                 })
-                if existing_groups:
-                    dialog = CustomAskString(self, "Radiobutton Group",
-                        f"Enter group name or pick existing:\nExisting: {', '.join(existing_groups)}")
-                else:
-                    dialog = CustomAskString(self, "Radiobutton Group",
-                        "Enter new group name for this radiobutton:")
+                dialog = RadioGroupDialog(self, existing_groups)
                 choice = dialog.result
                 if not choice:
                     return
@@ -3327,7 +3521,11 @@ class GUIBuilderApp(tk.Tk):
 
         self.prop_id.delete(0, tk.END)
         self.prop_id.insert(0, props['name'])
-        self.prop_type.config(text=props['type'])
+        type_label = props['type']
+        if props['type'] == 'Radiobutton':
+            group = props.get('_radio_group_name', '?')
+            type_label = f"Radiobutton  [{group}]"
+        self.prop_type.config(text=type_label)
         self.prop_text.delete(0, tk.END)
         self.prop_text.insert(0, props.get('text', ''))
         self.prop_x.delete(0, tk.END)
@@ -4336,7 +4534,7 @@ class GUIBuilderApp(tk.Tk):
             elif p['type'] == 'Radiobutton':
                 group_name = p.get('_radio_group_name', name)
                 if group_name not in radio_groups_done:
-                    lines.append(f"{group_name}_var = tk.StringVar()")
+                    lines.append(f"{group_name} = tk.StringVar()")
                     radio_groups_done.add(group_name)
         lines.append('')
 
@@ -4429,7 +4627,7 @@ class GUIBuilderApp(tk.Tk):
                              f"foreground={json.dumps(p.get('foreground','#000000'))}, "
                              f"background={json.dumps(p.get('background','#FFFFFF'))})")
                 lines.append(f"{name} = ttk.Radiobutton(root, text={json.dumps(p.get('text',''))}, "
-                             f"variable={group_name}_var, value={json.dumps(p.get('text',''))}, style='{style_name}')")
+                             f"variable={group_name}, value={json.dumps(p.get('text',''))}, style='{style_name}')")
 
             elif t == 'Listbox':
                 func_name = f"load_{name}_options"
