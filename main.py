@@ -5310,7 +5310,7 @@ class GUIBuilderApp(tk.Tk):
 
     # For exporting code in the code editor to a .py file
     def export_code(self):
-        """Export the code editor contents as a .py file."""
+        # Export the code editor contents as a .py file.
         from tkinter import filedialog, messagebox
 
         # Ask where to save
