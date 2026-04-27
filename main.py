@@ -1237,7 +1237,7 @@ class GUIBuilderApp(tk.Tk):
         if color and color[1]:
             self.prop_bg.delete(0, tk.END)
             self.prop_bg.insert(0, color[1])
-            self.apply_properties()
+            #self.apply_properties()
             self.bg_button.config(bg=color[1])
 
 
