@@ -1264,11 +1264,14 @@ class GUIBuilderApp(tk.Tk):
                 # Restore scroll position
                 self.code_text.yview_moveto(yview[0])
                 self.line_numbers.yview_moveto(yview[0])
+                self.center_tabs.select(1)
             else:
                 if last_action['action_type'] == "add":
                     self._undo_delete_element(last_action['name'])
                 elif last_action['action_type'] == "del":
                     self.add_element_from_undo_redo(last_action, 'copy', 'undo') # was new instead of copy but not sure why?
+
+                self.center_tabs.select(0)
 
             self._update_protected_tags()
         #print("Undo after UNDO ---")
@@ -1294,11 +1297,14 @@ class GUIBuilderApp(tk.Tk):
                 self.code_text.yview_moveto(yview[0])
                 self.line_numbers.yview_moveto(yview[0])
                 self.undo_stack.append(last_action)
+                self.center_tabs.select(1)
             else:
                 if last_action['action_type'] == "del":
                     self.add_element_from_undo_redo(last_action, 'copy', 'redo')
                 else:
                     self.add_element_from_undo_redo(last_action, 'copy', 'redo')
+
+                self.center_tabs.select(0)
 
             self._update_protected_tags()
 
