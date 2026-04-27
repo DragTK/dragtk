@@ -2857,6 +2857,8 @@ class GUIBuilderApp(tk.Tk):
             props['background'] = "#FFFFFF"
         elif eltype == "TextArea":
             props['text'] = ""
+            props['foreground'] = "#000000"
+            props['background'] = "#FFFFFF"
         elif eltype == "Listbox":
             props['text'] = ""
         elif eltype == "Combobox":
@@ -3059,6 +3061,20 @@ class GUIBuilderApp(tk.Tk):
                 widget.delete(0, tk.END)
                 widget.insert(0, text)
                 frame.config(bg=bg)  # make frame blend too
+                
+            elif props["type"] == "TextArea" and widget:
+                font_family = props.get('font_family', "Arial")
+                font_size = props.get('font_size', 12)
+                fg = props.get('foreground', "#000000")
+                bg = props.get('background', "#FFFFFF")
+                widget.config(
+                    font=(font_family, font_size),
+                    fg=fg,
+                    bg=bg
+                )
+                widget.delete(1.0, tk.END)
+                widget.insert(1.0, text)
+                frame.config(bg=bg)  # make frame blend too
 
 
             elif props["type"] == "Checkbutton" and widget:
@@ -3165,7 +3181,7 @@ class GUIBuilderApp(tk.Tk):
             widget.insert(0, text)
 
         elif eltype == 'TextArea':
-            widget = tk.Text(frame, width=20, height=5)
+            widget = tk.Text(frame, width=20, height=5, fg=props.get('foreground', "#000000"), bg=props.get('background', "#FFFFFF"))
 
         elif eltype == 'Listbox':
             widget = tk.Listbox(frame)
@@ -3543,7 +3559,7 @@ class GUIBuilderApp(tk.Tk):
         self.prop_h.delete(0, tk.END)
         self.prop_h.insert(0, str(props.get('h', 0)))
 
-        if props["type"] in ("Label", "Button", "Entry", "Checkbutton", "Radiobutton"):
+        if props["type"] in ("Label", "Button", "Entry", "Checkbutton", "Radiobutton", "TextArea"):
             self.prop_font_family.set(props.get("font_family", "Arial"))
             self.prop_font_size.delete(0, tk.END)
             self.prop_font_size.insert(0, props.get("font_size", 12))
@@ -3732,7 +3748,7 @@ class GUIBuilderApp(tk.Tk):
             props['w'] = int(self.prop_w.get())
             props['h'] = int(self.prop_h.get())
             
-            if props["type"] in ("Label", "Button", "Entry", "Checkbutton", "Radiobutton"):
+            if props["type"] in ("Label", "Button", "Entry", "Checkbutton", "Radiobutton", "TextArea"):
                 props["font_family"] = self.prop_font_family.get() or "Arial"
                 props["font_size"] = int(self.prop_font_size.get() or 12)
                 props["foreground"] = self.prop_fg.get() or "black"
@@ -4600,7 +4616,8 @@ class GUIBuilderApp(tk.Tk):
                     lines.append(f"{name}.insert(0, {json.dumps(p.get('text'))})")
 
             elif t == 'TextArea':
-                lines.append(f"{name} = tk.Text(root, wrap='word')")
+                lines.append(f"{name} = tk.Text(root, wrap='word', font=({json.dumps(p.get('font_family','Arial'))}, "
+                             f"{p.get('font_size',12)}), fg={json.dumps(p.get('foreground','#000000'))}, bg={json.dumps(p.get('background','#FFFFFF'))})")
                 if p.get('text'):
                     lines.append(f"{name}.insert('1.0', {json.dumps(p.get('text'))})")
 
