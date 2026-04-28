@@ -1,5 +1,5 @@
 # DragTK
-# Copyright (c) 2025-2026 Marcus Douglas
+# Copyright (c) 2025–2026 Marcus Douglas (DragTK)
 # Licensed under the MIT License. See LICENSE file for details.
 # Last Updated: 2026-04-26
 # Version 1.0.0
@@ -3193,9 +3193,14 @@ class GUIBuilderApp(tk.Tk):
             widget.set(text)
 
         elif eltype == 'Treeview':
-            widget = ttk.Treeview(frame, columns=('c1',), show='headings', height=3)
-            widget.heading('c1', text='Column')
-            widget.insert('', 'end', values=(text,))
+            cols = ('Heading1', 'Heading2', 'Heading3')
+            widget = ttk.Treeview(frame, columns=cols, show='headings', height=3)
+            for col in cols:
+                widget.heading(col, text=col)
+                widget.column(col, width=60)
+            widget.insert('', 'end', values=('C1 Item', 'C2 Item', 'C3 Item'))
+            widget.insert('', 'end', values=('C1 Item', 'C2 Item', 'C3 Item'))
+            widget.insert('', 'end', values=('C1 Item', 'C2 Item', 'C3 Item'))
 
         elif eltype == 'Checkbutton':
             var = tk.BooleanVar(value=False)
@@ -3276,8 +3281,11 @@ class GUIBuilderApp(tk.Tk):
             target.bind('<ButtonRelease-1>', lambda e, n=name: self._on_mouse_up(e, n))
             target.bind('<Motion>',          lambda e, n=name: self._update_cursor(e, n))
             target.bind('<Button-3>',        lambda e, n=name: self._show_element_menu(e, n))
+            target.bind("<Control-c>", lambda e, n=name: self._conditional_copy(e, n))
+            target.bind("<Control-v>", lambda e, n=name: self._conditional_copy(e, n))
 
         widget.bind('<Double-1>', lambda e, n=name: self.widget_double_click(e, n))
+        
 
 
 
@@ -4493,11 +4501,11 @@ class GUIBuilderApp(tk.Tk):
                     lines.append(self.preserved_handlers[func_name])
                 else:
                     lines.append("    # Replace with your own data retrieval logic")
-                    lines.append("    headers = (\"Name\", \"Age\", \"Job\")")
+                    lines.append("    headers = (\"Heading1\", \"Heading2\", \"Heading3\")")
                     lines.append("    sample_data = [")
-                    lines.append("        (\"Alice\", \"25\", \"Teacher\"),")
-                    lines.append("        (\"Bob\", \"30\", \"Engineer\"),")
-                    lines.append("        (\"Charlie\", \"35\", \"Designer\")")
+                    lines.append("        (\"C1 Item1\", \"C2 Item1\", \"C3 Item1\"),")
+                    lines.append("        (\"C1 Item2\", \"C2 Item1\", \"C3 Item1\"),")
+                    lines.append("        (\"C1 Item3\", \"C2 Item1\", \"C3 Item1\")")
                     lines.append("    ]")
                     lines.append("    return headers, sample_data")
                 lines.append('')
