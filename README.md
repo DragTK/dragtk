@@ -63,7 +63,7 @@ Every student already knows what an app looks like. DragTK turns that prior know
 
 ## Known limitations
 
-- Limited undo / redo support
+- Limited undo / redo support. Current implementation basic and inefficient. Performance issues with current undo/redo implementation on larger projects
 - Performance may degrade the more widgets are added and for larger projects
 - Users must place their code between the marked start and end areas or could be at risk of losing work. The app does its best to prevent this
 
